@@ -7,6 +7,25 @@
 
 const STORAGE_KEY = "wg_state_v2";
 
+
+/** SFX (original, self-generated wavs in assets/sfx/) */
+const SFX_SRC = {
+  open: "assets/sfx/open_pack.wav",
+  flip: "assets/sfx/card_flip.wav",
+  claim: "assets/sfx/claim.wav",
+};
+let sfxEnabled = true;
+function playSfx(key){
+  if(!sfxEnabled) return;
+  const src = SFX_SRC[key];
+  if(!src) return;
+  try{
+    const a = new Audio(src);
+    a.preload = "auto";
+    a.volume = 0.55;
+    a.play().catch(()=>{});
+  }catch{}
+}
 /** Gameplay knobs */
 const PACK_CAP = 10;
 const PACK_REGEN_SEC = 60;         // 1 min / pack
@@ -219,6 +238,7 @@ function claimMission(id){
   state.packs = clamp(state.packs + MISSION_REWARD_PACKS, 0, 9999);
   saveState();
   toast(`ミッション報酬 +${MISSION_REWARD_PACKS} パック`);
+  playSfx("claim");
   render();
 }
 function renderMissions(){
@@ -475,6 +495,7 @@ function renderBigCard(card){
     const img = document.createElement("img");
     img.src = card.thumb;
     img.alt = "";
+    img.className = "bigImg";
     img.loading = "lazy";
     thumb.appendChild(img);
   }
@@ -517,6 +538,7 @@ function renderBigCard(card){
 }
 
 function showCardModal(card){
+  playSfx("flip");
   openModal({
     title: "カード詳細",
     bodyNode: renderBigCard(card),
@@ -532,6 +554,8 @@ async function openPack(){
     toast("パックがありません（1分で回復 / ミッション報酬あり）");
     return;
   }
+
+  playSfx("open");
 
   state.packs -= 1;
   const gold = isGoldNextOpen();
@@ -579,6 +603,7 @@ function showPackRevealModal(cards, gold){
     const tile = renderRevealCard(c);
     tile.addEventListener("click", () => {
       selected = c;
+      playSfx("flip");
       right.innerHTML = "";
       right.appendChild(renderBigCard(selected));
     });
