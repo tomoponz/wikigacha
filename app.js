@@ -96,6 +96,27 @@ const ui = {
   copyResultBtn: el("#copyResultBtn"),
   shareResultBtn: el("#shareResultBtn"),
   shareImageBtn: el("#shareImageBtn"),
+  // RPG
+  rpgMapGrid: el("#rpgMapGrid"),
+  rpgStartBtn: el("#rpgStartBtn"),
+  rpgCampBtn: el("#rpgCampBtn"),
+  rpgResetBtn: el("#rpgResetBtn"),
+  rpgText: el("#rpgText"),
+  rpgCmd: el("#rpgCmd"),
+  rpgCmd1: el("#rpgCmd1"),
+  rpgCmd2: el("#rpgCmd2"),
+  rpgCmd3: el("#rpgCmd3"),
+  rpgLog: el("#rpgLog"),
+  plLv: el("#plLv"),
+  plExp: el("#plExp"),
+  plExpNext: el("#plExpNext"),
+  plHp: el("#plHp"),
+  plHpMax: el("#plHpMax"),
+  plMp: el("#plMp"),
+  plMpMax: el("#plMpMax"),
+  plGold: el("#plGold"),
+  plLoc: el("#plLoc"),
+  rpgPartyList: el("#rpgPartyList"),
 };
 
 function tokyoDateString(d=new Date()){
@@ -145,7 +166,8 @@ function loadState(){
     st.favorites ||= {};
     if(!Array.isArray(st.deck)) st.deck=[null,null,null];
     return st;
-  }catch{ return defaultState(); }
+  }catch{ return defaultState(); },
+    rpg:{ lv:1, exp:0, expNext:100, hp:100, hpMax:100, mp:30, mpMax:30, gold:0, loc:"街：アーカイブ港", here:"TOWN", unlocked:{TOWN:true, RUINS:true, FOREST:true}, flags:{} }
 }
 let state = loadState();
 function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
@@ -1080,6 +1102,251 @@ function startTimers(){
 dailyResetMissionsIfNeeded();
 setupRouting();
 setupUI();
+rpgInit();
 hydrateControls();
 startTimers();
 render();
+
+
+/* === RPG MODE v4 (story scaffold) === */
+let rpgBusy = false;
+
+const RPG_NODES = [
+  { id:"TOWN",   name:"アーカイブ港", desc:"出航の街", kind:"safe", unlock:["RUINS","FOREST"] },
+  { id:"RUINS",  name:"欠損遺跡",     desc:"壊れた目次", kind:"enc",  unlock:["LAB"] },
+  { id:"FOREST", name:"注釈の森",     desc:"枝分かれする脚注", kind:"enc", unlock:["TOWER"] },
+  { id:"LAB",    name:"再編集工房",   desc:"修復装置", kind:"enc", unlock:["BOSS1"] },
+  { id:"TOWER",  name:"索引塔",       desc:"階層型ダンジョン", kind:"enc", unlock:["BOSS1"] },
+  { id:"BOSS1",  name:"虚偽の写本",   desc:"歪んだ伝承", kind:"boss", unlock:["SEA"] },
+  { id:"SEA",    name:"リンク海",     desc:"未知へ", kind:"safe", unlock:[] },
+];
+
+function getRpg(){
+  state.rpg ||= { lv:1, exp:0, expNext:100, hp:100, hpMax:100, mp:30, mpMax:30, gold:0, loc:"街：アーカイブ港", here:"TOWN", unlocked:{TOWN:true, RUINS:true, FOREST:true}, flags:{} };
+  return state.rpg;
+}
+
+function rpgLog(line, cls=""){
+  const div = document.createElement("div");
+  div.className = "line";
+  if(cls) div.classList.add(cls);
+  div.textContent = line;
+  ui.rpgLog.prepend(div);
+}
+
+function rpgSyncUI(){
+  const r = getRpg();
+  ui.plLv.textContent = String(r.lv);
+  ui.plExp.textContent = String(r.exp);
+  ui.plExpNext.textContent = String(r.expNext);
+  ui.plHp.textContent = String(r.hp);
+  ui.plHpMax.textContent = String(r.hpMax);
+  ui.plMp.textContent = String(r.mp);
+  ui.plMpMax.textContent = String(r.mpMax);
+  ui.plGold.textContent = String(r.gold);
+  ui.plLoc.textContent = r.loc;
+
+  const ids = (state.deck || []).filter(Boolean);
+  if(ids.length === 0){
+    ui.rpgPartyList.textContent = "未選択（図鑑から右クリックでデッキに追加）";
+  }else{
+    const names = ids.map(id => state.collection[id]?.card?.title || "???");
+    ui.rpgPartyList.textContent = names.join(" / ");
+  }
+}
+
+function rpgRenderMap(){
+  const r = getRpg();
+  ui.rpgMapGrid.innerHTML = "";
+  for(const n of RPG_NODES){
+    const unlocked = !!r.unlocked[n.id];
+    const div = document.createElement("div");
+    div.className = "mapNode" + (n.id===r.here ? " is-here" : "") + (!unlocked ? " is-locked" : "") + (n.kind==="boss" ? " is-boss" : "");
+    div.innerHTML = `<div class="n">${n.name}</div><div class="d">${n.desc}</div>`;
+    if(unlocked){
+      div.addEventListener("click", () => rpgMove(n.id));
+    }
+    ui.rpgMapGrid.appendChild(div);
+  }
+}
+
+function rpgSetText(text, choices=null){
+  ui.rpgText.textContent = text;
+  if(!choices){
+    ui.rpgCmd.hidden = true;
+    return;
+  }
+  ui.rpgCmd.hidden = false;
+  const [c1,c2,c3] = choices;
+  ui.rpgCmd1.textContent = c1?.label || "—";
+  ui.rpgCmd2.textContent = c2?.label || "—";
+  ui.rpgCmd3.textContent = c3?.label || "—";
+  ui.rpgCmd1.onclick = c1?.on || null;
+  ui.rpgCmd2.onclick = c2?.on || null;
+  ui.rpgCmd3.onclick = c3?.on || null;
+}
+
+function rpgMove(id){
+  const r = getRpg();
+  if(rpgBusy) return;
+  r.here = id;
+  const node = RPG_NODES.find(x => x.id===id);
+  r.loc = node ? (node.kind==="safe" ? `街：${node.name}` : `フィールド：${node.name}`) : r.loc;
+  saveState();
+  rpgSyncUI();
+  rpgRenderMap();
+  playSfx("click");
+  rpgSetText(`${node.name} に到着した。${node.desc}`);
+  rpgLog(`到着: ${node.name}`, node.kind==="safe" ? "good" : (node.kind==="boss" ? "bad" : "warn"));
+}
+
+function partyPower(){
+  const ids = (state.deck || []).filter(Boolean);
+  const cards = ids.map(id => state.collection[id]?.card).filter(Boolean);
+  const atk = cards.reduce((s,c)=>s+c.stats.atk,0);
+  const def = cards.reduce((s,c)=>s+c.stats.def,0);
+  const hp  = cards.reduce((s,c)=>s+c.stats.hp,0);
+  return { atk, def, hp, n: cards.length, cards };
+}
+
+function rpgGain(exp, gold){
+  const r = getRpg();
+  r.exp += exp;
+  r.gold += gold;
+  while(r.exp >= r.expNext){
+    r.exp -= r.expNext;
+    r.lv += 1;
+    r.expNext = Math.round(r.expNext * 1.22 + 30);
+    r.hpMax += 18;
+    r.mpMax += 6;
+    r.hp = r.hpMax;
+    r.mp = r.mpMax;
+    rpgLog(`レベルアップ！ Lv${r.lv}（全回復）`, "good");
+  }
+  saveState();
+  rpgSyncUI();
+}
+
+async function rpgQuest(){
+  const r = getRpg();
+  if(rpgBusy) return;
+  rpgBusy = true;
+
+  const node = RPG_NODES.find(x => x.id===r.here) || RPG_NODES[0];
+  const party = partyPower();
+
+  if(party.n === 0){
+    rpgSetText("パーティが空だ。図鑑からデッキに3枚入れてから出発しよう。");
+    toast("パーティ（デッキ）が空です");
+    rpgBusy = false;
+    return;
+  }
+
+  playSfx("open");
+  rpgSetText(`${node.name} を探索する。どうする？`, [
+    { label:"戦う", on: () => rpgEncounter("fight") },
+    { label:"調べる", on: () => rpgEncounter("analyze") },
+    { label:"引き返す", on: () => { rpgSetText("様子を見ることにした。"); rpgBusy=false; ui.rpgCmd.hidden=true; } },
+  ]);
+}
+
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+async function rpgEncounter(mode){
+  const r = getRpg();
+  const node = RPG_NODES.find(x => x.id===r.here) || RPG_NODES[0];
+  const party = partyPower();
+  ui.rpgCmd.hidden = true;
+
+  const scale = 0.85 + r.lv*0.10 + (node.kind==="boss" ? 0.55 : 0.0);
+  let enemyHp = Math.round((party.hp*0.12 + 320) * scale);
+  let enemyAtk = Math.round((party.atk*0.10 + 140) * scale);
+  let enemyDef = Math.round((party.def*0.08 + 110) * scale);
+
+  rpgLog(`遭遇: 欠損の影 HP${enemyHp}`, "warn");
+  rpgSetText("敵が現れた…");
+
+  let turns = 0;
+  while(enemyHp > 0 && r.hp > 0 && turns < 12){
+    turns += 1;
+    await sleep(520);
+
+    let pDmg = 0;
+    if(mode === "analyze"){
+      pDmg = Math.max(1, Math.round((party.def*0.06 + party.atk*0.04) - enemyDef*0.03 + (Math.random()*12-4)));
+    }else{
+      pDmg = Math.max(1, Math.round(party.atk*0.08 - enemyDef*0.04 + (Math.random()*18-6)));
+    }
+    enemyHp -= pDmg;
+    playSfx("flip");
+    rpgLog(`T${turns}: 味方 → ${pDmg} dmg / 敵HP ${Math.max(0, enemyHp)}`, "good");
+
+    if(enemyHp <= 0) break;
+
+    await sleep(520);
+    const guard = (mode === "analyze") ? 0.85 : 1.0;
+    const eDmg = Math.max(1, Math.round((enemyAtk*0.32 - party.def*0.03) * guard + (Math.random()*14-5)));
+    r.hp -= eDmg;
+    playSfx("flip");
+    rpgLog(`T${turns}: 敵 → ${eDmg} dmg / 味方HP ${Math.max(0, r.hp)}`, "bad");
+
+    rpgSyncUI();
+    saveState();
+  }
+
+  if(r.hp <= 0){
+    rpgSetText("……視界が暗くなる。街へ搬送された。");
+    rpgLog("敗北…（街へ戻った）", "bad");
+    r.hp = r.hpMax; r.mp = r.mpMax;
+    r.here = "TOWN"; r.loc = "街：アーカイブ港";
+    saveState();
+    rpgSyncUI();
+    rpgRenderMap();
+    rpgBusy = false;
+    return;
+  }
+
+  const exp = Math.round(18 + r.lv*6 + (mode==="analyze"? 8:0) + (node.kind==="boss"? 25:0));
+  const gold = Math.round(10 + r.lv*4 + (node.kind==="boss"? 20:0));
+  rpgSetText(`勝利！ EXP+${exp} / G+${gold}`);
+  rpgLog(`勝利！ EXP+${exp} / G+${gold}`, "good");
+  rpgGain(exp, gold);
+
+  if(node.unlock){
+    node.unlock.forEach(nid => { r.unlocked[nid] = true; });
+    saveState();
+    rpgRenderMap();
+  }
+
+  rpgBusy = false;
+}
+
+function rpgCamp(){
+  const r = getRpg();
+  if(rpgBusy) return;
+  r.hp = r.hpMax;
+  r.mp = r.mpMax;
+  saveState();
+  rpgSyncUI();
+  rpgLog("キャンプ：HP/MP回復", "good");
+  toast("回復しました");
+  playSfx("claim");
+}
+
+function rpgReset(){
+  state.rpg = null;
+  saveState();
+  rpgLog("RPGデータを初期化しました", "warn");
+  rpgSyncUI();
+  rpgRenderMap();
+  toast("RPGデータ初期化");
+}
+
+function rpgInit(){
+  if(!ui.rpgMapGrid) return;
+  rpgSyncUI();
+  rpgRenderMap();
+  ui.rpgStartBtn.addEventListener("click", ()=>{ playSfx("click"); rpgQuest(); });
+  ui.rpgCampBtn.addEventListener("click", ()=>{ playSfx("click"); rpgCamp(); });
+  ui.rpgResetBtn.addEventListener("click", ()=>{ playSfx("click"); rpgReset(); });
+}

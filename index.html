@@ -18,6 +18,7 @@
       <div class="navTabs" role="tablist" aria-label="pages">
         <button class="navTab is-active" data-route="gacha" role="tab" aria-selected="true">ガチャ</button>
         <button class="navTab" data-route="zukan" role="tab" aria-selected="false">図鑑</button>
+        <button class="navTab" data-route="rpg" role="tab" aria-selected="false">冒険</button>
         <button class="navTab" data-route="battle" role="tab" aria-selected="false">バトル</button>
       </div>
 
@@ -116,7 +117,56 @@
         </div>
       </section>
 
-      <section class="page" id="page-battle" data-page="battle" hidden>
+      
+      <section class="page rpg" id="page-rpg" data-page="rpg" hidden>
+        <div class="rpgWrap">
+          <div class="rpgRow">
+            <section class="window rpgStatus">
+              <div class="windowTitle">ステータス</div>
+              <div class="rpgStatGrid">
+                <div class="rpgStatItem"><div class="k">Lv</div><div class="v" id="plLv">1</div></div>
+                <div class="rpgStatItem"><div class="k">EXP</div><div class="v"><span id="plExp">0</span>/<span id="plExpNext">100</span></div></div>
+                <div class="rpgStatItem"><div class="k">HP</div><div class="v"><span id="plHp">100</span>/<span id="plHpMax">100</span></div></div>
+                <div class="rpgStatItem"><div class="k">MP</div><div class="v"><span id="plMp">30</span>/<span id="plMpMax">30</span></div></div>
+                <div class="rpgStatItem"><div class="k">G</div><div class="v" id="plGold">0</div></div>
+                <div class="rpgStatItem"><div class="k">場所</div><div class="v" id="plLoc">街：アーカイブ港</div></div>
+              </div>
+              <div class="rpgParty">
+                <div class="k">パーティ（デッキ）</div>
+                <div class="v" id="rpgPartyList">未選択（図鑑から右クリックでデッキに入れてね）</div>
+                <div class="rpgSmall">※パーティ＝バトルで使うデッキ3枚。図鑑から右クリック（長押し）で追加。</div>
+              </div>
+            </section>
+
+            <section class="window rpgMap">
+              <div class="windowTitle">ワールド</div>
+              <div class="rpgMapGrid" id="rpgMapGrid" aria-label="world map"></div>
+              <div class="rpgMapFoot">
+                <button class="rpgBtn" id="rpgStartBtn" type="button">クエスト開始</button>
+                <button class="rpgBtn" id="rpgCampBtn" type="button">キャンプ（回復）</button>
+                <button class="rpgBtn" id="rpgResetBtn" type="button">データ初期化</button>
+              </div>
+            </section>
+          </div>
+
+          <section class="window rpgMsg">
+            <div class="windowTitle">メッセージ</div>
+            <div class="rpgText" id="rpgText">カードは「知識の断片」。世界を修復するため、君はアーカイブの外へ出る…。</div>
+            <div class="rpgCmd" id="rpgCmd" hidden>
+              <button class="rpgCmdBtn" id="rpgCmd1" type="button">選択肢1</button>
+              <button class="rpgCmdBtn" id="rpgCmd2" type="button">選択肢2</button>
+              <button class="rpgCmdBtn" id="rpgCmd3" type="button">選択肢3</button>
+            </div>
+          </section>
+
+          <section class="window rpgLogWin">
+            <div class="windowTitle">ログ</div>
+            <div class="rpgLog" id="rpgLog"></div>
+          </section>
+        </div>
+      </section>
+
+<section class="page" id="page-battle" data-page="battle" hidden>
         <div class="battleGrid">
           <section class="panel panel--wide">
             <div class="panelRow">
