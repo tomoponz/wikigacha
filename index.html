@@ -1,79 +1,155 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Wikipedia Gacha</title>
-    <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WikiGacha（サンプル実装）</title>
+  <meta name="description" content="Wikipediaのランダム記事をカード化して引ける、ガチャ風コレクション（オリジナル実装サンプル）。" />
+  <link rel="stylesheet" href="styles.css" />
+  <script defer src="app.js"></script>
 </head>
+
 <body>
-    <header class="header">
-        <div class="nav-top">
-            <span class="lang-selector">🇯🇵 JP</span>
-            <div class="main-nav">
-                <a href="#" class="active">Gacha</a>
-                <a href="#">Collection</a>
-                <a href="#">Battle</a>
-            </div>
-            <div class="trophy">🏆 ?</div>
-        </div>
-    </header>
-
-    <main class="container">
-        <section class="status-section">
-            <h1 class="title">Wikipedia Gacha</h1>
-            <div class="pack-status">
-                <h2>DAILY PACKS: <span id="pack-count">10</span> / 10</h2>
-                <p class="subtitle">Packs full</p>
-                <div class="progress-container">
-                    <p id="gold-pack-text"><span id="pulls-left">10</span> pulls until Gold Pack</p>
-                    <div class="progress-bar"><div class="progress-fill" id="gold-progress"></div></div>
-                </div>
-            </div>
-        </section>
-
-        <section class="gacha-section">
-            <div class="wiki-pack" id="open-pack-btn">
-                <div class="pack-visual">
-                    <div class="pack-logo">WIKI<br>PACK</div>
-                </div>
-                <p class="tap-text">▲ TAP TO OPEN ▲</p>
-            </div>
-        </section>
-
-        <section class="missions-section">
-            <h3>Daily Missions</h3>
-            <ul class="mission-list">
-                <li><span class="m-text">Open 5 packs</span> <span class="m-progress" id="ms-open-packs">0/5</span></li>
-                <li><span class="m-text">Pull at least one SR+ card</span> <span class="m-progress" id="ms-sr">0/1</span></li>
-                <li><span class="m-text">Open Wikipedia once</span> <span class="m-progress" id="ms-wiki">0/1</span></li>
-                <li><span class="m-text">Share your result</span> <span class="m-progress">0/1</span></li>
-                <li><span class="m-text">Watch one ad</span> <span class="m-progress">0/1</span></li>
-            </ul>
-            <p class="reward-text">Reward: +2 packs per completed mission</p>
-        </section>
-    </main>
-
-    <footer class="footer">
-        <a href="#">Privacy Policy</a> | 
-        <a href="#">Terms of Service</a> | 
-        <a href="#">Contact</a>
-    </footer>
-
-    <div id="result-modal" class="modal hidden">
-        <div class="modal-content">
-            <div class="card" id="result-card">
-                <h2 id="card-rarity" class="rarity">UR</h2>
-                <h3 id="card-title" class="card-title">記事タイトル</h3>
-            </div>
-            <div class="modal-actions">
-                <a id="wiki-link" href="#" target="_blank" class="btn btn-wiki">Open Wikipedia</a>
-                <button id="close-btn" class="btn btn-close">Close</button>
-            </div>
-        </div>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand__mark" aria-hidden="true">WG</div>
+      <div class="brand__text">
+        <div class="brand__title">WikiGacha</div>
+        <div class="brand__sub">Wikipedia ランダム記事ガチャ（サンプル）</div>
+      </div>
     </div>
 
-    <script src="script.js"></script>
+    <nav class="tabs" aria-label="main navigation">
+      <button class="tab is-active" data-route="gacha">ガチャ</button>
+      <button class="tab" data-route="zukan">図鑑</button>
+      <button class="tab" data-route="battle">バトル</button>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <!-- === GACHA === -->
+    <section class="page" id="page-gacha" data-page="gacha">
+      <div class="grid2">
+        <section class="card">
+          <h2>本日のパック</h2>
+          <div class="meter">
+            <div class="meter__row">
+              <div class="meter__value" id="packsText">-- / --</div>
+              <div class="meter__sub" id="packsHint">--</div>
+            </div>
+            <div class="meter__bar"><div class="meter__fill" id="packsFill" style="width:0%"></div></div>
+          </div>
+
+          <div class="meter meter--minor">
+            <div class="meter__row">
+              <div class="meter__value">金パックまで</div>
+              <div class="meter__sub"><span id="toGoldText">--</span>回</div>
+            </div>
+          </div>
+
+          <div class="packArea">
+            <button class="pack" id="packBtn" type="button" aria-label="パックを開ける">
+              <span class="pack__label">▲ タップで開ける ▲</span>
+              <span class="pack__shine" aria-hidden="true"></span>
+              <span class="pack__art" aria-hidden="true"></span>
+            </button>
+            <div class="small muted">※このページは「完全再現」ではなく、同系統の機能を一から作ったサンプルです。</div>
+          </div>
+
+          <div class="row">
+            <button class="btn" id="shareBtn" type="button" disabled>結果をシェア</button>
+            <button class="btn" id="supportBtn" type="button">広告の代わりに支援（デモ）</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>デイリーミッション</h2>
+          <ul class="missions" id="missions"></ul>
+          <div class="small muted">報酬: 各ミッション達成で <b>+2 パック</b></div>
+
+          <hr class="sep" />
+
+          <h3>最後に引いたカード</h3>
+          <div id="lastCardEmpty" class="empty">
+            まだ引いていません。パックをタップして引いてください。
+          </div>
+          <div id="lastCardHost"></div>
+        </section>
+      </div>
+    </section>
+
+    <!-- === ZUKAN === -->
+    <section class="page" id="page-zukan" data-page="zukan" hidden>
+      <section class="card">
+        <div class="row row--between">
+          <h2>図鑑</h2>
+          <div class="row">
+            <input class="input" id="searchInput" placeholder="検索（タイトル）" />
+            <select class="select" id="rarityFilter">
+              <option value="">全レア</option>
+              <option value="N">N</option>
+              <option value="R">R</option>
+              <option value="SR">SR</option>
+              <option value="SSR">SSR</option>
+            </select>
+          </div>
+        </div>
+        <div class="small muted">保存はブラウザ内（localStorage）。別端末へは同期しません。</div>
+
+        <div class="zukanGrid" id="zukanGrid"></div>
+        <div class="empty" id="zukanEmpty" hidden>まだカードがありません。ガチャを引いてください。</div>
+      </section>
+    </section>
+
+    <!-- === BATTLE === -->
+    <section class="page" id="page-battle" data-page="battle" hidden>
+      <div class="grid2">
+        <section class="card">
+          <h2>デッキ選択</h2>
+          <div class="small muted">図鑑から3枚選んで戦闘（簡易シミュレーション）。</div>
+          <div class="deck" id="deck"></div>
+          <div class="row">
+            <button class="btn" id="autoPickBtn" type="button">自動で3枚選ぶ</button>
+            <button class="btn btn--primary" id="battleBtn" type="button">バトル開始</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>ログ</h2>
+          <div class="log" id="battleLog"></div>
+        </section>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div class="small">
+        Wikipedia API（ja.wikipedia.org）から取得した要約・サムネイルを表示します。内容の著作権は各権利者に帰属します。
+      </div>
+      <div class="links">
+        <a href="privacy.html">プライバシーポリシー（雛形）</a>
+        <a href="terms.html">利用規約（雛形）</a>
+        <a href="contact.html">お問い合わせ（雛形）</a>
+      </div>
+    </footer>
+  </main>
+
+  <!-- Modal -->
+  <div class="modal" id="modal" hidden>
+    <div class="modal__backdrop" id="modalClose"></div>
+    <div class="modal__panel" role="dialog" aria-modal="true" aria-label="カード詳細">
+      <div class="modal__head">
+        <div class="modal__title" id="modalTitle">カード</div>
+        <button class="iconBtn" id="modalX" aria-label="閉じる">✕</button>
+      </div>
+      <div class="modal__body" id="modalBody"></div>
+      <div class="modal__foot">
+        <button class="btn" id="openWikiBtn" type="button">Wikipediaを開く</button>
+        <button class="btn btn--primary" id="okBtn" type="button">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 </body>
 </html>
