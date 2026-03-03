@@ -1113,8 +1113,8 @@ function startTimers(){
 dailyResetMissionsIfNeeded();
 setupRouting();
 setupUI();
-rpgInit();
-hydrateControls();
+setTimeout(()=>{ try{ rpgInit(); }catch(e){ console.error(e); } },0);
+  hydrateControls();
 startTimers();
 render();
 
@@ -1806,7 +1806,7 @@ async function rpgCombatTurn(cmd){
   // v6: combat is handled by dq overlay
   return;
 }
-(){
+async function rpgCombatWin(){
   const r = getRpg();
   const e = rpgBattle.enemy;
   const reward = rpgBattle.reward || {winExp:18, winGold:14, shardChance:0.12};
