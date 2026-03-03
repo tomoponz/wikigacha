@@ -674,3 +674,116 @@ a:hover{opacity:.9}
   object-fit:cover;
   filter: saturate(1.06) contrast(1.06) brightness(1.06);
 }
+
+
+/* === v3.1 Nav layout fix (avoid overlap on small screens) === */
+.nav{
+  display: grid !important;
+  grid-template-columns: 44px 1fr auto;
+  align-items: center;
+  justify-content: initial;
+}
+.navIcon--left{
+  position: static !important;
+  justify-self: start;
+}
+.navTabs{ justify-self: center; }
+.navRight{
+  position: static !important;
+  justify-self: end;
+}
+@media (max-width: 520px){
+  .nav{padding: 10px 10px; column-gap: 10px;}
+  .navTabs{gap: 12px;}
+  .navTab{font-size: 16px;}
+  .navRight{gap: 8px;}
+  .navInfo{width: 30px; height: 30px;}
+  .navSound{width: 34px; height: 34px;}
+}
+@media (max-width: 360px){
+  .navTab{font-size: 15px;}
+  .navTabs{gap: 10px;}
+}
+
+
+
+/* === v3.1 Viewer actions visibility (desktop + small height) === */
+.viewer{
+  overflow-y: auto;
+}
+.viewerActions{
+  position: sticky;
+  bottom: 0;
+  padding-top: 12px;
+  padding-bottom: calc(14px + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, rgba(0,0,0,0.00), rgba(0,0,0,0.55));
+  backdrop-filter: blur(6px);
+  border-top: 1px solid rgba(255,255,255,.08);
+}
+
+
+
+/* === v3.1 Battle arena + commands === */
+.arena{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 6px;
+}
+@media (max-width: 680px){ .arena{grid-template-columns: 1fr;} }
+.hpCol{
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(0,0,0,.24);
+  padding: 12px;
+}
+.hpLabel{
+  font-size: 12px;
+  color: rgba(255,255,255,.62);
+  margin-bottom: 8px;
+  font-weight: 900;
+}
+.hpBar{
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.08);
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.10);
+}
+.hpFill{
+  height: 100%;
+  width: 0%;
+  background: rgba(34,197,94,.88);
+  transition: width .35s ease;
+}
+.hpFill--enemy{ background: rgba(248,113,113,.88); }
+.hpNum{
+  margin-top: 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: rgba(255,255,255,.68);
+}
+.cmd{
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+@media (max-width: 680px){ .cmd{grid-template-columns: repeat(2, minmax(0,1fr));} }
+.cmdBtn{
+  border: 1px solid rgba(255,255,255,.18);
+  background: rgba(255,255,255,.05);
+  color: rgba(255,255,255,.92);
+  padding: 14px 12px;
+  border-radius: 14px;
+  cursor: pointer;
+  font-weight: 1000;
+  font-size: 14px;
+}
+.cmdBtn:hover{border-color: rgba(255,255,255,.30)}
+.cmdBtn:disabled{opacity:.45; cursor:not-allowed}
+.cmdBtn--danger{
+  border-color: rgba(248,113,113,.35);
+  background: rgba(248,113,113,.10);
+}
+

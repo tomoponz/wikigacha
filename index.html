@@ -130,7 +130,40 @@
             <div class="deck" id="deck"></div>
           </section>
 
+          
           <section class="panel panel--wide">
+            <div class="panelRow">
+              <h3 class="panelTitle">バトル</h3>
+              <div class="panelBtns">
+                <button class="btn" id="resetBattleBtn" type="button">リセット</button>
+              </div>
+            </div>
+
+            <div class="arena">
+              <div class="hpCol">
+                <div class="hpLabel">味方HP</div>
+                <div class="hpBar"><div id="allyHpFill" class="hpFill"></div></div>
+                <div class="hpNum"><span id="allyHpNow">-</span>/<span id="allyHpMax">-</span></div>
+              </div>
+
+              <div class="hpCol">
+                <div class="hpLabel">敵HP</div>
+                <div class="hpBar"><div id="enemyHpFill" class="hpFill hpFill--enemy"></div></div>
+                <div class="hpNum"><span id="enemyHpNow">-</span>/<span id="enemyHpMax">-</span></div>
+              </div>
+            </div>
+
+            <div class="cmd" id="cmdPanel" hidden>
+              <button class="cmdBtn" id="cmdAttack" type="button">攻撃</button>
+              <button class="cmdBtn" id="cmdGuard" type="button">防御</button>
+              <button class="cmdBtn" id="cmdBurst" type="button">必殺</button>
+              <button class="cmdBtn cmdBtn--danger" id="cmdForfeit" type="button">撤退</button>
+            </div>
+
+            <div class="zHint" id="battleHint">「バトル開始」でコマンドが表示されます。攻撃/防御/必殺を選んで進行。</div>
+          </section>
+
+<section class="panel panel--wide">
             <h3 class="panelTitle">ログ</h3>
             <div class="log" id="battleLog"></div>
           </section>

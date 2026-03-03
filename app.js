@@ -57,6 +57,19 @@ const ui = {
   autoPickBtn: el("#autoPickBtn"),
   battleBtn: el("#battleBtn"),
   battleLog: el("#battleLog"),
+  battleHint: el("#battleHint"),
+  resetBattleBtn: el("#resetBattleBtn"),
+  cmdPanel: el("#cmdPanel"),
+  cmdAttack: el("#cmdAttack"),
+  cmdGuard: el("#cmdGuard"),
+  cmdBurst: el("#cmdBurst"),
+  cmdForfeit: el("#cmdForfeit"),
+  allyHpFill: el("#allyHpFill"),
+  enemyHpFill: el("#enemyHpFill"),
+  allyHpNow: el("#allyHpNow"),
+  allyHpMax: el("#allyHpMax"),
+  enemyHpNow: el("#enemyHpNow"),
+  enemyHpMax: el("#enemyHpMax"),
   langBtn: el("#langBtn"),
   trophyBtn: el("#trophyBtn"),
   soundBtn: el("#soundBtn"),
@@ -663,33 +676,209 @@ function writeLog(line, cls=""){
   div.textContent=line; ui.battleLog.prepend(div);
 }
 function shortTitle(t){ const s=(t||"").trim(); return s.length>14?s.slice(0,14)+"…":s; }
-function battle(){
-  const ids=(state.deck||[]).filter(Boolean);
-  if(ids.length<1){ toast("デッキが空です（最低1枚）"); return; }
-  const team=ids.map(id=>state.collection[id]?.card).filter(Boolean);
-  if(team.length<1){ toast("デッキ情報が不正です。選び直してください"); return; }
-  const sumAtk=team.reduce((s,c)=>s+c.stats.atk,0);
-  const sumDef=team.reduce((s,c)=>s+c.stats.def,0);
-  const sumHp=team.reduce((s,c)=>s+c.stats.hp,0);
-  const enemy={name:"UNKNOWN ENTITY", hp:Math.round(sumHp*0.75+Math.random()*sumHp*0.55), atk:Math.round(sumAtk*0.45+Math.random()*sumAtk*0.35), def:Math.round(sumDef*0.40+Math.random()*sumDef*0.35)};
-  writeLog("==== BATTLE START ====","warn");
-  writeLog(`敵: ${enemy.name} / HP ${enemy.hp} / ATK ${enemy.atk} / DEF ${enemy.def}`);
-  let eHp=enemy.hp, tHp=sumHp;
-  for(let turn=1;turn<=12;turn++){
-    if(eHp<=0||tHp<=0) break;
-    const hitter=team[Math.floor(Math.random()*team.length)];
-    const dmg=Math.max(1,Math.round(hitter.stats.atk-enemy.def*0.35+(Math.random()*12-4)));
-    eHp-=dmg; writeLog(`T${turn}: 味方(${shortTitle(hitter.title)}) → ${dmg} dmg / 敵HP ${Math.max(0,eHp)}`,"good");
-    if(eHp<=0) break;
-    const target=team[Math.floor(Math.random()*team.length)];
-    const edmg=Math.max(1,Math.round(enemy.atk-target.stats.def*0.35+(Math.random()*12-4)));
-    tHp-=edmg; writeLog(`T${turn}: 敵 → ${edmg} dmg / 味方HP ${Math.max(0,tHp)}`,"bad");
-  }
-  if(eHp<=0){ writeLog("勝利！ +1 パック（デモ報酬）","good"); state.packs+=1; }
-  else if(tHp<=0){ writeLog("敗北…（報酬なし）","bad"); }
-  else { writeLog("時間切れ… 引き分け（報酬なし）","warn"); }
-  saveState(); packsUI();
+
+/** === Battle v3.1 (interactive commands) === */
+let battleState = null;
+
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+function setCmdEnabled(on){
+  const btns = [ui.cmdAttack, ui.cmdGuard, ui.cmdBurst, ui.cmdForfeit];
+  btns.forEach(b => { if(b) b.disabled = !on; });
 }
+
+function updateHpUI(){
+  if(!battleState) return;
+  const { allyHp, allyHpMax, enemyHp, enemyHpMax } = battleState;
+  ui.allyHpNow.textContent = String(Math.max(0, Math.round(allyHp)));
+  ui.allyHpMax.textContent = String(Math.round(allyHpMax));
+  ui.enemyHpNow.textContent = String(Math.max(0, Math.round(enemyHp)));
+  ui.enemyHpMax.textContent = String(Math.round(enemyHpMax));
+
+  const aPct = allyHpMax > 0 ? (allyHp / allyHpMax) * 100 : 0;
+  const ePct = enemyHpMax > 0 ? (enemyHp / enemyHpMax) * 100 : 0;
+  ui.allyHpFill.style.width = `${Math.max(0, Math.min(100, aPct))}%`;
+  ui.enemyHpFill.style.width = `${Math.max(0, Math.min(100, ePct))}%`;
+}
+
+function updateBurstBtn(){
+  if(!ui.cmdBurst) return;
+  if(!battleState){
+    ui.cmdBurst.textContent = "必殺";
+    ui.cmdBurst.disabled = true;
+    return;
+  }
+  const cd = battleState.burstCd;
+  if(cd > 0){
+    ui.cmdBurst.textContent = `必殺 (CD ${cd})`;
+    ui.cmdBurst.disabled = true;
+  }else{
+    ui.cmdBurst.textContent = "必殺";
+    ui.cmdBurst.disabled = false;
+  }
+}
+
+function battleReset(){
+  battleState = null;
+  if(ui.cmdPanel) ui.cmdPanel.hidden = true;
+  if(ui.battleHint) ui.battleHint.textContent = "「バトル開始」でコマンドが表示されます。攻撃/防御/必殺を選んで進行。";
+  ui.allyHpNow.textContent = "-"; ui.allyHpMax.textContent = "-";
+  ui.enemyHpNow.textContent = "-"; ui.enemyHpMax.textContent = "-";
+  ui.allyHpFill.style.width = "0%";
+  ui.enemyHpFill.style.width = "0%";
+  setCmdEnabled(false);
+  updateBurstBtn();
+}
+
+function battleStart(){
+  const ids = (state.deck || []).filter(Boolean);
+  if(ids.length < 1){
+    toast("デッキが空です（最低1枚）");
+    return;
+  }
+  const team = ids.map(id => state.collection[id]?.card).filter(Boolean);
+  if(team.length < 1){
+    toast("デッキ情報が不正です。選び直してください");
+    return;
+  }
+
+  const sumAtk = team.reduce((s,c)=>s+c.stats.atk,0);
+  const sumDef = team.reduce((s,c)=>s+c.stats.def,0);
+  const sumHp  = team.reduce((s,c)=>s+c.stats.hp,0);
+
+  const enemy = {
+    name: "UNKNOWN ENTITY",
+    hp: Math.round(sumHp * 0.95 + Math.random()*sumHp*0.45),
+    atk: Math.round(sumAtk * 0.55 + Math.random()*sumAtk*0.35),
+    def: Math.round(sumDef * 0.45 + Math.random()*sumDef*0.35),
+  };
+
+  battleState = {
+    team,
+    enemy,
+    allyHpMax: sumHp,
+    allyHp: sumHp,
+    enemyHpMax: enemy.hp,
+    enemyHp: enemy.hp,
+    guard: false,
+    burstCd: 0,
+    turn: 1,
+    busy: false,
+  };
+
+  if(ui.battleHint) ui.battleHint.textContent = "コマンドを選んで進行。必殺はクールダウンあり。";
+  ui.cmdPanel.hidden = false;
+  setCmdEnabled(true);
+  updateHpUI();
+  updateBurstBtn();
+
+  writeLog("==== BATTLE START ====", "warn");
+  writeLog(`敵: ${enemy.name} / HP ${enemy.hp} / ATK ${enemy.atk} / DEF ${enemy.def}`);
+}
+
+function pickTeamCard(){
+  const t = battleState.team;
+  return t[Math.floor(Math.random()*t.length)];
+}
+
+async function doEnemyTurn(){
+  if(!battleState) return;
+  const { enemy } = battleState;
+  await sleep(450);
+
+  const target = pickTeamCard();
+  const guardMult = battleState.guard ? 0.55 : 1.0;
+  battleState.guard = false;
+
+  const edmg = Math.max(1, Math.round((enemy.atk*0.78 - target.stats.def*0.35) * guardMult + (Math.random()*18 - 6)));
+  battleState.allyHp -= edmg;
+
+  writeLog(`敵 → ${edmg} dmg / 味方HP ${Math.max(0, Math.round(battleState.allyHp))}`, "bad");
+  updateHpUI();
+}
+
+function endBattle(result){
+  if(!battleState) return;
+  ui.cmdPanel.hidden = true;
+  setCmdEnabled(false);
+
+  if(result === "win"){
+    writeLog("勝利！ +1 パック（デモ報酬）", "good");
+    state.packs += 1;
+    saveState();
+    packsUI();
+  }else if(result === "lose"){
+    writeLog("敗北…（報酬なし）", "bad");
+  }else{
+    writeLog("撤退しました", "warn");
+  }
+
+  battleState = null;
+  updateBurstBtn();
+}
+
+async function playerAction(type){
+  if(!battleState || battleState.busy) return;
+  battleState.busy = true;
+
+  setCmdEnabled(false);
+
+  if(battleState.burstCd > 0) battleState.burstCd -= 1;
+  updateBurstBtn();
+
+  const hitter = pickTeamCard();
+  const enemy = battleState.enemy;
+
+  if(type === "attack"){
+    const dmg = Math.max(1, Math.round(hitter.stats.atk*0.72 - enemy.def*0.30 + (Math.random()*22 - 8)));
+    battleState.enemyHp -= dmg;
+    writeLog(`T${battleState.turn}: 味方(${shortTitle(hitter.title)}) → ${dmg} dmg / 敵HP ${Math.max(0, Math.round(battleState.enemyHp))}`, "good");
+    updateHpUI();
+  }
+
+  if(type === "guard"){
+    battleState.guard = true;
+    writeLog(`T${battleState.turn}: 味方は防御態勢（次の被ダメ軽減）`, "warn");
+  }
+
+  if(type === "burst"){
+    if(battleState.burstCd > 0){
+      toast("必殺はクールダウン中");
+    }else{
+      const dmg = Math.max(1, Math.round(hitter.stats.atk*1.35 - enemy.def*0.15 + (Math.random()*40 - 10)));
+      battleState.enemyHp -= dmg;
+      battleState.burstCd = 3;
+      writeLog(`T${battleState.turn}: 必殺！(${shortTitle(hitter.title)}) → ${dmg} dmg / 敵HP ${Math.max(0, Math.round(battleState.enemyHp))}`, "good");
+      updateHpUI();
+      updateBurstBtn();
+    }
+  }
+
+  if(type === "forfeit"){
+    endBattle("forfeit");
+    return;
+  }
+
+  if(battleState.enemyHp <= 0){
+    endBattle("win");
+    return;
+  }
+
+  await doEnemyTurn();
+
+  if(!battleState) return;
+
+  if(battleState.allyHp <= 0){
+    endBattle("lose");
+    return;
+  }
+
+  battleState.turn += 1;
+  updateBurstBtn();
+  setCmdEnabled(true);
+  battleState.busy = false;
+}
+
 
 /* Info + trophies + settings */
 function showInfo(){
@@ -851,7 +1040,13 @@ function setupUI(){
   });
 
   ui.autoPickBtn.addEventListener("click", autoPickDeck);
-  ui.battleBtn.addEventListener("click",()=>{ playSfx("click"); battle(); });
+  ui.battleBtn.addEventListener("click",()=>{ playSfx("click"); if(!battleState) battleStart(); else toast("進行中：コマンドで操作してください"); });
+
+  ui.resetBattleBtn.addEventListener("click", ()=>{ playSfx("click"); battleReset(); toast("リセットしました"); });
+  ui.cmdAttack.addEventListener("click", ()=>{ playSfx("click"); playerAction("attack"); });
+  ui.cmdGuard.addEventListener("click", ()=>{ playSfx("click"); playerAction("guard"); });
+  ui.cmdBurst.addEventListener("click", ()=>{ playSfx("click"); playerAction("burst"); });
+  ui.cmdForfeit.addEventListener("click", ()=>{ playSfx("click"); playerAction("forfeit"); });
 
   ui.langBtn.addEventListener("click",()=>toast("言語切替はデモ（未実装）"));
   ui.infoBtn.addEventListener("click",()=>{ playSfx("click"); showInfo(); });
