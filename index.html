@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wikipedia Gacha</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>Wikipedia Gacha</h1>
+        <div class="lang-selector">🇯🇵 JP</div>
+    </header>
+    
+    <nav>
+        <button class="active">ガチャ</button>
+        <button>コレクション</button>
+        <button>バトル</button>
+        <button>🏆</button>
+        <button>❓</button>
+    </nav>
+    
+    <main>
+        <section class="pack-status">
+            <h2>デイリーパック: <span id="pack-count">10</span> / 10</h2>
+            <p class="status-text">パック満タン</p>
+            <p class="gold-pack-progress">ゴールドパックまであと <span id="pulls-left">10</span> 回</p>
+        </section>
+
+        <section class="gacha-area">
+            <div class="wiki-pack" id="open-pack-btn">
+                <div class="pack-title">Wiki Pack</div>
+                <div class="tap-text">▲ タップして開ける ▲</div>
+            </div>
+        </section>
+
+        <section class="missions">
+            <h3>デイリーミッション</h3>
+            <ul class="mission-list">
+                <li><span>5パック開ける</span> <span class="progress">0/5</span></li>
+                <li><span>SR以上のカードを1枚引く</span> <span class="progress">0/1</span></li>
+                <li><span>Wikipediaを1回開く</span> <span class="progress">0/1</span></li>
+                <li><span>結果をシェアする</span> <span class="progress">0/1</span></li>
+                <li><span>広告を1回見る</span> <span class="progress">0/1</span></li>
+            </ul>
+            <p class="reward-text">報酬: ミッション達成ごとに +2 パック</p>
+        </section>
+    </main>
+
+    <footer>
+        <a href="#">プライバシーポリシー</a> | 
+        <a href="#">利用規約</a> | 
+        <a href="#">お問い合わせ</a>
+    </footer>
+
+    <div id="result-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2 id="card-rarity">SR</h2>
+            <h3 id="card-title">Wikipedia記事タイトル</h3>
+            <p id="card-desc">記事の概要がここに入ります...</p>
+            <button id="close-modal-btn">閉じる</button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
