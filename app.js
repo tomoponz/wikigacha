@@ -119,6 +119,12 @@ const ui = {
   plGold: el("#plGold"),
   plLoc: el("#plLoc"),
   rpgPartyList: el("#rpgPartyList"),
+  // DQ battle overlay
+  dqBattle: el("#dqBattle"),
+  dqEnemies: el("#dqEnemies"),
+  dqMsg: el("#dqMsg"),
+  dqMenu: el("#dqMenu"),
+  dqStatus: el("#dqStatus"),
 };
 
 function tokyoDateString(d=new Date()){
@@ -1124,6 +1130,257 @@ let rpgBusy = false;
 let rpgBattle = null;
 const rpgWait = (ms) => new Promise(r => setTimeout(r, ms));
 
+/* --- DQ BATTLE v6 (command input + enemy display) --- */
+const dq = {
+  open(enemies, onFinish){
+    ui.dqBattle.hidden = false;
+    this.onFinish = onFinish;
+    this.enemies = enemies;
+    this.phase = "cmd";
+    this.cmd = null;
+    this.lock = false;
+    this.renderEnemies();
+    this.setMsg(`${this.enemyNameLine()} が あらわれた！`);
+    this.renderStatus();
+    this.renderCmdMenu();
+  },
+  close(){
+    ui.dqBattle.hidden = true;
+    ui.dqMenu.innerHTML = "";
+    this.onFinish = null;
+    this.enemies = null;
+    this.phase = "cmd";
+    this.cmd = null;
+    this.lock = false;
+  },
+  enemyNameLine(){
+    const alive = this.enemies.filter(e=>e.hp>0);
+    if(alive.length===1) return alive[0].name;
+    // DQ-ish plural
+    return `${alive[0].name}たち`;
+  },
+  renderEnemies(){
+    ui.dqEnemies.innerHTML = "";
+    this.enemies.forEach((e, idx)=>{
+      const s = document.createElement("div");
+      s.className = "slime" + (e.hp<=0 ? " is-dead" : "");
+      s.dataset.idx = String(idx);
+
+      const elEyeL = document.createElement("div"); elEyeL.className = "eye l";
+      const elEyeR = document.createElement("div"); elEyeR.className = "eye r";
+      const mouth = document.createElement("div"); mouth.className = "mouth";
+      s.appendChild(elEyeL); s.appendChild(elEyeR); s.appendChild(mouth);
+
+      if(e.hp>0){
+        s.addEventListener("click", ()=>{
+          if(this.phase!=="target" || this.lock) return;
+          this.chooseTarget(idx);
+        });
+      }
+      ui.dqEnemies.appendChild(s);
+    });
+  },
+  renderStatus(){
+    const r = getRpg();
+    const party = partyPower();
+    const alive = this.enemies.filter(e=>e.hp>0).length;
+    ui.dqStatus.innerHTML =
+      `Lv ${r.lv}  HP ${Math.max(0,Math.round(r.hp))}/${Math.round(r.hpMax)}  MP ${Math.max(0,Math.round(r.mp))}/${Math.round(r.mpMax)}\n` +
+      `PT: ${party.n}枚  ATK ${Math.round(party.atk)}  DEF ${Math.round(party.def)}\n` +
+      `敵: ${alive}体`;
+  },
+  setMsg(text){
+    ui.dqMsg.textContent = text;
+  },
+  setMenu(btns){
+    ui.dqMenu.innerHTML = "";
+    btns.forEach(b=>{
+      const btn = document.createElement("button");
+      btn.className = "dqBtn";
+      btn.textContent = b.label;
+      btn.disabled = !!b.disabled;
+      btn.addEventListener("click", b.on);
+      ui.dqMenu.appendChild(btn);
+    });
+  },
+  renderCmdMenu(){
+    this.phase = "cmd";
+    this.cmd = null;
+    this.setMenu([
+      { label:"たたかう", on: ()=>this.chooseCmd("attack") },
+      { label:"ぼうぎょ", on: ()=>this.chooseCmd("guard") },
+      { label:"ひっさつ (MP10)", disabled: getRpg().mp < 10, on: ()=>this.chooseCmd("burst") },
+      { label:"にげる", on: ()=>this.chooseCmd("run") },
+    ]);
+  },
+  renderTargetMenu(){
+    this.phase = "target";
+    const targets = this.enemies.map((e,i)=>({
+      label: e.hp>0 ? `${e.name} ${Math.max(0,Math.round(e.hp))}HP` : `${e.name} (×)`,
+      disabled: e.hp<=0,
+      on: ()=>this.chooseTarget(i),
+    })).slice(0,4);
+    // If less than 4, pad with blanks to keep grid stable
+    while(targets.length<4) targets.push({label:"—", disabled:true, on:()=>{}});
+    this.setMenu(targets);
+    this.setMsg("だれを こうげき？（敵をタップでもOK）");
+  },
+  chooseCmd(cmd){
+    if(this.lock) return;
+    this.cmd = cmd;
+
+    if(cmd==="attack" || cmd==="burst"){
+      this.renderTargetMenu();
+      return;
+    }
+
+    if(cmd==="guard"){
+      this.playerTurn({type:"guard", target:null});
+      return;
+    }
+
+    if(cmd==="run"){
+      this.playerTurn({type:"run", target:null});
+      return;
+    }
+  },
+  chooseTarget(i){
+    if(this.lock) return;
+    const target = this.enemies[i];
+    if(!target || target.hp<=0) return;
+    this.playerTurn({type:this.cmd, targetIndex:i});
+  },
+  async playerTurn(action){
+    if(this.lock) return;
+    this.lock = true;
+
+    const r = getRpg();
+    const party = partyPower();
+    const enemies = this.enemies;
+
+    // Guard
+    if(action.type==="guard"){
+      rpgBattle.guard = true;
+      playSfx("click");
+      this.setMsg("みかたは みをまもっている！");
+      rpgLog("RPG: 防御態勢（DQ）", "warn");
+      saveState(); rpgSyncUI();
+      await rpgWait(520);
+      await this.enemyTurn();
+      this.lock = false;
+      this.renderStatus();
+      this.renderCmdMenu();
+      return;
+    }
+
+    // Run
+    if(action.type==="run"){
+      const ok = Math.random() < 0.55;
+      this.setMsg(ok ? "うまく にげきれた！" : "まわりこまれて しまった！");
+      rpgLog(ok ? "RPG: 逃走成功" : "RPG: 逃走失敗", ok?"good":"bad");
+      await rpgWait(700);
+      if(ok){
+        this.lock = false;
+        this.close();
+        this.onFinish?.({ result:"run" });
+        return;
+      }
+      await this.enemyTurn();
+      this.lock = false;
+      this.renderStatus();
+      this.renderCmdMenu();
+      return;
+    }
+
+    // Attack / Burst
+    const t = enemies[action.targetIndex];
+    if(!t || t.hp<=0){
+      this.lock = false;
+      this.renderCmdMenu();
+      return;
+    }
+
+    let dmg = 0;
+
+    if(action.type==="burst"){
+      if(r.mp < 10){
+        toast("MPが足りない");
+        this.lock = false;
+        this.renderCmdMenu();
+        return;
+      }
+      r.mp -= 10;
+      dmg = Math.max(1, Math.round(party.atk*0.10 - t.def*0.04 + (Math.random()*50 - 10)));
+      playSfx("open");
+      this.setMsg(`ひっさつ！ ${t.name} に ${dmg} のダメージ！`);
+    }else{
+      dmg = Math.max(1, Math.round(party.atk*0.08 - t.def*0.04 + (Math.random()*22 - 7)));
+      playSfx("flip");
+      this.setMsg(`${t.name} に こうげき！ ${dmg} のダメージ！`);
+    }
+
+    t.hp -= dmg;
+    if(t.hp <= 0){
+      t.hp = 0;
+      await rpgWait(620);
+      this.setMsg(`${t.name} を たおした！`);
+      playSfx("claim");
+    }
+
+    saveState();
+    rpgSyncUI();
+    this.renderEnemies();
+    this.renderStatus();
+
+    // Victory?
+    if(enemies.every(e=>e.hp<=0)){
+      await rpgWait(680);
+      this.lock = false;
+      this.close();
+      this.onFinish?.({ result:"win" });
+      return;
+    }
+
+    await rpgWait(620);
+    await this.enemyTurn();
+
+    // Defeat?
+    if(getRpg().hp <= 0){
+      await rpgWait(650);
+      this.lock = false;
+      this.close();
+      this.onFinish?.({ result:"lose" });
+      return;
+    }
+
+    this.lock = false;
+    this.renderStatus();
+    this.renderCmdMenu();
+  },
+  async enemyTurn(){
+    const r = getRpg();
+    const party = partyPower();
+    const guardMult = rpgBattle.guard ? 0.55 : 1.0;
+    rpgBattle.guard = false;
+
+    const alive = this.enemies.filter(e=>e.hp>0);
+    if(alive.length===0) return;
+
+    // one random enemy attacks (DQ-ish simple)
+    const attacker = alive[Math.floor(Math.random()*alive.length)];
+    const edmg = Math.max(1, Math.round((attacker.atk*0.32 - party.def*0.03) * guardMult + (Math.random()*18 - 6)));
+    r.hp -= edmg;
+    playSfx("flip");
+    this.setMsg(`${attacker.name} の こうげき！ ${edmg} のダメージ！`);
+    rpgLog(`RPG: 敵攻撃 ${attacker.name} → ${edmg}`, "bad");
+
+    saveState();
+    rpgSyncUI();
+    this.renderStatus();
+    await rpgWait(720);
+  }
+};
+
 const RPG_SHARD_MAX = 7;
 
 /** Map nodes (chapter gates) */
@@ -1368,6 +1625,17 @@ function rpgSkillCheck(tag, stat, diff, onWin, onLose){
   rpgBusy = false;
 }
 
+function makeEnemyPack(kind, chapter, party, count){
+  const c = Math.max(1, Math.min(3, count||1));
+  const enemies = [];
+  for(let i=0;i<c;i++){
+    const e = makeEnemy(kind, chapter, party);
+    e.name = (c>1) ? `${e.name}${i+1}` : e.name;
+    enemies.push(e);
+  }
+  return enemies;
+}
+
 function makeEnemy(kind, chapter, party){
   const base = 0.85 + chapter*0.18 + (party.rarityScore/18)*0.08;
   const hp = Math.round((party.hp*0.11 + 320) * base);
@@ -1403,7 +1671,7 @@ function rpgEventFor(nodeId){
       text:"アルミホイル帽の集団が手を振ってくる。「空白は救い。君も軽くなろう」",
       choices: [
         { label:"話を聞く", run: ()=> rpgSkillCheck("TALK", party.def, 420, ()=>{ rpgLog("詭弁の穴を突いた。相手は黙った。","good"); rpgGain(14, 18, Math.random()<0.20?1:0); }, ()=>{ rpgLog("危うく帽子を被せられた！","bad"); r.hp=Math.max(1,r.hp-12); saveState(); rpgSyncUI(); }) },
-        { label:"戦う", run: ()=> rpgStartCombat(makeEnemy("FOIL_FAN", ch, party), {winExp:16, winGold:22, shardChance:0.18}) },
+        { label:"戦う", run: ()=> rpgStartCombat(makeEnemyPack("FOIL_FAN", ch, party, 3), {winExp:16, winGold:22, shardChance:0.18}) },
         { label:"全力で走る", run: ()=> { rpgLog("全力で走った。なぜか勝った気分。","warn"); rpgGain(6, 6, 0); rpgBusy=false; } },
       ],
     },
@@ -1427,7 +1695,7 @@ function rpgEventFor(nodeId){
       choices: [
         { label:"一緒に行進", run: ()=> { rpgLog("行進した。なぜかEXPが入った。","good"); rpgGain(18, 10, Math.random()<0.15?1:0); rpgBusy=false; } },
         { label:"論破する", run: ()=> rpgSkillCheck("DEBATE", party.def, 620, ()=>{ rpgLog("カエルは満足して去った。","good"); rpgGain(20, 18, 0); }, ()=>{ rpgLog("カエルの声が脳に刺さる。","bad"); r.mp=Math.max(0,r.mp-8); saveState(); rpgSyncUI(); }) },
-        { label:"戦う", run: ()=> rpgStartCombat(makeEnemy("FROG", ch, party), {winExp:22, winGold:24, shardChance:0.20}) },
+        { label:"戦う", run: ()=> rpgStartCombat(makeEnemyPack("FROG", ch, party, 2), {winExp:22, winGold:24, shardChance:0.20}) },
       ],
     },
     {
@@ -1450,7 +1718,7 @@ function rpgEventFor(nodeId){
       choices: [
         { label:"索引で突破（DEF）", run: ()=> rpgSkillCheck("INDEX", party.def, 820, ()=>{ rpgLog("索引が刺さった。出口が出た。","good"); rpgGain(28, 30, Math.random()<0.18?1:0); }, ()=>{ rpgLog("迷った。迷いすぎた。","bad"); r.mp=Math.max(0,r.mp-10); saveState(); rpgSyncUI(); }) },
         { label:"力で突破（ATK）", run: ()=> rpgSkillCheck("SMASH", party.atk, 860, ()=>{ rpgLog("壁が…目次だった。壊した。","good"); rpgGain(26, 24, 0); rpgBusy=false; }, ()=>{ rpgLog("目次に跳ね返された。","bad"); r.hp=Math.max(1,r.hp-18); saveState(); rpgSyncUI(); }) },
-        { label:"戦う", run: ()=> rpgStartCombat(makeEnemy("INDEX_EEL", ch, party), {winExp:30, winGold:32, shardChance:0.22}) },
+        { label:"戦う", run: ()=> rpgStartCombat(makeEnemyPack("INDEX_EEL", ch, party, 2), {winExp:30, winGold:32, shardChance:0.22}) },
       ],
     },
   ];
@@ -1467,84 +1735,78 @@ function rpgEventFor(nodeId){
 }
 
 /** Combat */
-function rpgStartCombat(enemy, reward){
+
+function rpgStartCombat(enemyOrEnemies, reward){
   const r = getRpg();
   const party = partyPower();
 
-  rpgBattle = { enemy, party, guard:false, turn:1, reward };
+  const list = Array.isArray(enemyOrEnemies) ? enemyOrEnemies : [enemyOrEnemies];
 
-  rpgSetText(`${enemy.name} が現れた！ どうする？`, [
-    { label:"攻撃", on: ()=> rpgCombatTurn("attack") },
-    { label:"防御", on: ()=> rpgCombatTurn("guard") },
-    { label:"必殺（MP10）", on: ()=> rpgCombatTurn("burst") },
-  ]);
+  // normalize + name (DQ style)
+  const enemies = list.map((e, i)=>({
+    name: e.name || `スライム${i+1}`,
+    hp: Math.max(1, Math.round(e.hp || 80)),
+    atk: Math.max(1, Math.round(e.atk || 60)),
+    def: Math.max(1, Math.round(e.def || 40)),
+  }));
 
-  rpgLog(`戦闘開始: ${enemy.name} HP${enemy.hp}`, "warn");
+  rpgBattle = { enemies, party, guard:false, turn:1, reward };
+  rpgBusy = true;
+
+  dq.open(enemies, async ({result})=>{
+    if(result==="run"){
+      rpgBusy = false;
+      rpgBattle = null;
+      rpgSetText("うまく逃げた。…今のうちに装備（デッキ）見直す？");
+      return;
+    }
+    if(result==="win"){
+      // rewards
+      const rew = reward || {winExp:18, winGold:14, shardChance:0.12};
+      const shard = (Math.random() < (rew.shardChance||0)) ? 1 : 0;
+
+      rpgLog(`勝利！（DQ）`, "good");
+      rpgGain(rew.winExp||18, rew.winGold||14, shard);
+
+      r.stats.wins = (r.stats.wins||0) + 1;
+      saveState();
+
+      const hereNode = RPG_NODES.find(n=>n.id===r.here);
+      if(hereNode?.kind==="boss"){
+        r.stats.boss = (r.stats.boss||0)+1;
+        await rpgBossClear(r.here);
+      }
+
+      rpgBusy = false;
+      rpgBattle = null;
+      rpgSetText(shard ? "勝利！ 欠片を拾った（+1）" : "勝利！ もう一戦いく？");
+      return;
+    }
+
+    if(result==="lose"){
+      r.stats.losses = (r.stats.losses||0)+1;
+      rpgLog("敗北… 港へ搬送された（財布は無事）", "bad");
+      r.hp = r.hpMax;
+      r.mp = r.mpMax;
+      r.here = "TOWN";
+      r.loc = "街：アーカイブ港";
+
+      saveState();
+      rpgSyncUI();
+      rpgRenderMap();
+
+      rpgBusy = false;
+      rpgBattle = null;
+      rpgSetText("目が覚めた。港だ。…屋台の匂いで復活した。");
+    }
+  });
 }
 
 async function rpgCombatTurn(cmd){
-  const r = getRpg();
-  if(!rpgBattle || rpgBusy) return;
-  rpgBusy = true;
-
-  const e = rpgBattle.enemy;
-  const party = rpgBattle.party;
-
-  if(cmd==="guard"){
-    rpgBattle.guard = true;
-    playSfx("click");
-    rpgLog(`T${rpgBattle.turn}: 防御態勢（次の被ダメ軽減）`, "warn");
-  }else if(cmd==="burst"){
-    if(r.mp < 10){ toast("MPが足りない"); rpgBusy=false; return; }
-    r.mp -= 10;
-    const dmg = Math.max(1, Math.round(party.atk*0.10 - e.def*0.04 + (Math.random()*50 - 10)));
-    e.hp -= dmg;
-    playSfx("open");
-    rpgLog(`T${rpgBattle.turn}: 必殺！ → ${dmg} dmg / 敵HP ${Math.max(0,e.hp)}`, "good");
-  }else{
-    const dmg = Math.max(1, Math.round(party.atk*0.08 - e.def*0.04 + (Math.random()*22 - 7)));
-    e.hp -= dmg;
-    playSfx("flip");
-    rpgLog(`T${rpgBattle.turn}: 攻撃 → ${dmg} dmg / 敵HP ${Math.max(0,e.hp)}`, "good");
-  }
-
-  saveState();
-  rpgSyncUI();
-
-  if(e.hp <= 0){
-    await rpgWait(350);
-    await rpgCombatWin();
-    return;
-  }
-
-  await rpgWait(520);
-  const guardMult = rpgBattle.guard ? 0.55 : 1.0;
-  rpgBattle.guard = false;
-
-  const edmg = Math.max(1, Math.round((e.atk*0.32 - party.def*0.03) * guardMult + (Math.random()*18 - 6)));
-  r.hp -= edmg;
-  playSfx("flip");
-  rpgLog(`T${rpgBattle.turn}: 敵 → ${edmg} dmg / 味方HP ${Math.max(0,Math.round(r.hp))}`, "bad");
-
-  saveState();
-  rpgSyncUI();
-
-  if(r.hp <= 0){
-    await rpgWait(350);
-    rpgCombatLose();
-    return;
-  }
-
-  rpgBattle.turn += 1;
-  rpgBusy = false;
-  rpgSetText(`${e.name} と戦闘中…`, [
-    { label:"攻撃", on: ()=> rpgCombatTurn("attack") },
-    { label:"防御", on: ()=> rpgCombatTurn("guard") },
-    { label:"必殺（MP10）", on: ()=> rpgCombatTurn("burst") },
-  ]);
+  // v6: combat is handled by dq overlay
+  return;
 }
-
-async function rpgCombatWin(){
+(){
   const r = getRpg();
   const e = rpgBattle.enemy;
   const reward = rpgBattle.reward || {winExp:18, winGold:14, shardChance:0.12};
