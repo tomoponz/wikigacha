@@ -23,6 +23,7 @@
 
       <div class="navRight">
         <button class="navIcon" id="trophyBtn" type="button" aria-label="Trophies">🏆</button>
+        <button class="navSound" id="soundBtn" type="button" aria-label="Sound">🔊</button>
         <button class="navInfo" id="infoBtn" type="button" aria-label="Game Info">?</button>
       </div>
     </nav>
@@ -86,6 +87,15 @@
             <h2 class="zTitle">図鑑</h2>
             <div class="zControls">
               <input class="input" id="searchInput" placeholder="キーワードで検索（タイトル）" />
+              <select class="select" id="sortSelect" aria-label="sort">
+                <option value="rarity">レア順</option>
+                <option value="new">新着</option>
+                <option value="atk">ATK</option>
+                <option value="def">DEF</option>
+                <option value="count">重複数</option>
+                <option value="title">タイトル</option>
+              </select>
+              <label class="favOnly"><input type="checkbox" id="favOnly" /> ★のみ</label>
               <select class="select" id="rarityFilter" aria-label="rarity filter">
                 <option value="">全レア</option>
                 <option value="C">C</option>
@@ -144,6 +154,41 @@
     </div>
 
     <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
+  
+    <!-- Card Viewer (TCG-style) -->
+    <div class="viewer" id="viewer" hidden>
+      <div class="viewerTop">
+        <button class="viewerIcon" id="prevCardBtn" type="button" aria-label="Prev">‹</button>
+        <div class="viewerCount"><span id="viewerIndex">1</span>/<span id="viewerTotal">5</span></div>
+        <button class="viewerIcon" id="nextCardBtn" type="button" aria-label="Next">›</button>
+
+        <button class="viewerMini" id="copyOneBtn" type="button" aria-label="Copy">⧉</button>
+        <button class="viewerSound" id="viewerSoundBtn" type="button" aria-label="Sound">🔊</button>
+      </div>
+
+      <div class="viewerHint">左右スワイプ or &lt;&gt; でめくる</div>
+
+      <div class="viewerStage" id="viewerStage">
+        <div class="stack" aria-hidden="true">
+          <div class="stackCard"></div>
+          <div class="stackCard"></div>
+          <div class="stackCard"></div>
+          <div class="stackCard"></div>
+        </div>
+
+        <div class="tcgWrap">
+          <div class="tcgCard" id="tcgCard"></div>
+        </div>
+      </div>
+
+      <div class="viewerActions">
+        <button class="btn btn--ghost" id="closeViewerBtn" type="button">パック画面に戻る</button>
+        <button class="btn btn--copy" id="copyResultBtn" type="button">結果をコピー</button>
+        <button class="btn btn--share" id="shareResultBtn" type="button">結果を共有</button>
+        <button class="btn btn--img" id="shareImageBtn" type="button">画像で共有</button>
+      </div>
+    </div>
+
   </main>
 </body>
 </html>
