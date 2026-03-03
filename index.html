@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WikiGacha</title>
+  <meta name="description" content="Wikipediaのランダム記事をTCG風カードにして集めるガチャ（オリジナル実装）。" />
+  <link rel="preload" as="image" href="wikipedia_pack_1.png" />
+  <link rel="stylesheet" href="styles.css" />
+  <script defer src="app.js"></script>
+</head>
+
+<body>
+  <main class="app">
+    <nav class="nav" aria-label="top navigation">
+      <button class="navIcon navIcon--left" id="langBtn" type="button" aria-label="Toggle Language">🇯🇵</button>
+
+      <div class="navTabs" role="tablist" aria-label="pages">
+        <button class="navTab is-active" data-route="gacha" role="tab" aria-selected="true">ガチャ</button>
+        <button class="navTab" data-route="zukan" role="tab" aria-selected="false">図鑑</button>
+        <button class="navTab" data-route="battle" role="tab" aria-selected="false">バトル</button>
+      </div>
+
+      <div class="navRight">
+        <button class="navIcon" id="trophyBtn" type="button" aria-label="Trophies">🏆</button>
+        <button class="navInfo" id="infoBtn" type="button" aria-label="Game Info">?</button>
+      </div>
+    </nav>
+
+    <div class="pad">
+      <section class="page" id="page-gacha" data-page="gacha">
+        <div class="stage">
+          <div class="hud">
+            <span class="hudBadge">
+              本日のパック: <span class="hudNum" id="packsNow">--</span> / <span class="hudNum" id="packsMax">--</span>
+            </span>
+            <p class="hudSub" id="packsHint">--</p>
+            <p class="hudGold">金パックまであと<span id="toGoldText">--</span>回</p>
+          </div>
+
+          <button class="packWrap" id="packBtn" type="button" aria-label="パックを開ける">
+            <div class="packShadow" aria-hidden="true"></div>
+            <img class="packImg" src="wikipedia_pack_1.png" alt="Wiki Pack" />
+            <div class="packTap">▲ タップで開ける ▲</div>
+          </button>
+
+          <section class="panel">
+            <h3 class="panelTitle">デイリーミッション</h3>
+            <ul class="missionList" id="missions"></ul>
+            <p class="panelFoot">報酬: 各ミッション達成で <b>+2 パック</b></p>
+          </section>
+
+          <section class="panel panel--wide">
+            <div class="panelRow">
+              <h3 class="panelTitle">最後に開けたパック</h3>
+              <div class="panelBtns">
+                <button class="btn" id="shareBtn" type="button" disabled>結果をシェア</button>
+                <button class="btn" id="supportBtn" type="button">広告の代わりに支援（デモ）</button>
+              </div>
+            </div>
+            <div id="lastCardEmpty" class="empty">
+              まだ引いていません。パックをタップして引いてください。
+            </div>
+            <div id="lastCardHost"></div>
+            <div class="hintLine">※1回で <b>5枚</b> 排出（オリジナル実装）。パックは <b>1分で1回復</b>（最大10）。</div>
+          </section>
+
+          <div id="applixir-anchor" class="adAnchor" aria-hidden="true"></div>
+        </div>
+
+        <footer class="foot">
+          <p class="footMsg">
+            こちらはオリジナル実装のデモです。Wikipedia API（ja.wikipedia.org）から要約・サムネイルを取得して表示します。
+          </p>
+          <div class="footLinks">
+            <a href="privacy.html">プライバシーポリシー</a><span>|</span>
+            <a href="terms.html">利用規約</a><span>|</span>
+            <a href="contact.html">お問い合わせ</a>
+          </div>
+        </footer>
+      </section>
+
+      <section class="page" id="page-zukan" data-page="zukan" hidden>
+        <div class="zukanWrap">
+          <div class="zukanHead">
+            <h2 class="zTitle">図鑑</h2>
+            <div class="zControls">
+              <input class="input" id="searchInput" placeholder="キーワードで検索（タイトル）" />
+              <select class="select" id="rarityFilter" aria-label="rarity filter">
+                <option value="">全レア</option>
+                <option value="C">C</option>
+                <option value="UC">UC</option>
+                <option value="R">R</option>
+                <option value="SR">SR</option>
+                <option value="SSR">SSR</option>
+                <option value="UR">UR</option>
+                <option value="LR">LR</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="zHint">保存はブラウザ内（localStorage）。右クリック（または長押し）でデッキに追加。</div>
+
+          <div class="zGrid" id="zukanGrid"></div>
+          <div class="empty" id="zukanEmpty" hidden>まだカードがありません。ガチャを引いてください。</div>
+        </div>
+      </section>
+
+      <section class="page" id="page-battle" data-page="battle" hidden>
+        <div class="battleGrid">
+          <section class="panel panel--wide">
+            <div class="panelRow">
+              <h3 class="panelTitle">デッキ選択</h3>
+              <div class="panelBtns">
+                <button class="btn" id="autoPickBtn" type="button">自動で3枚選ぶ</button>
+                <button class="btn btn--pri" id="battleBtn" type="button">バトル開始</button>
+              </div>
+            </div>
+            <div class="zHint">図鑑から最大3枚を選んで戦闘（簡易シミュレーション）。</div>
+            <div class="deck" id="deck"></div>
+          </section>
+
+          <section class="panel panel--wide">
+            <h3 class="panelTitle">ログ</h3>
+            <div class="log" id="battleLog"></div>
+          </section>
+        </div>
+      </section>
+    </div>
+
+    <div class="modal" id="modal" hidden>
+      <div class="modal__backdrop" id="modalClose"></div>
+      <div class="modal__panel" role="dialog" aria-modal="true" aria-label="表示">
+        <div class="modal__head">
+          <div class="modal__title" id="modalTitle">表示</div>
+          <button class="iconBtn" id="modalX" aria-label="閉じる">✕</button>
+        </div>
+        <div class="modal__body" id="modalBody"></div>
+        <div class="modal__foot" id="modalFoot">
+          <button class="btn" id="openWikiBtn" type="button">Wikipediaを開く</button>
+          <button class="btn btn--pri" id="okBtn" type="button">OK</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
+  </main>
+</body>
+</html>
