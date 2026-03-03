@@ -2,66 +2,78 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Wikipedia Gacha</title>
     <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
 </head>
 <body>
-    <header>
-        <h1>Wikipedia Gacha</h1>
-        <div class="lang-selector">🇯🇵 JP</div>
+    <header class="header">
+        <div class="nav-top">
+            <span class="lang-selector">🇯🇵 JP</span>
+            <div class="main-nav">
+                <a href="#" class="active">Gacha</a>
+                <a href="#">Collection</a>
+                <a href="#">Battle</a>
+            </div>
+            <div class="trophy">🏆 ?</div>
+        </div>
     </header>
-    
-    <nav>
-        <button class="active">ガチャ</button>
-        <button>コレクション</button>
-        <button>バトル</button>
-        <button>🏆</button>
-        <button>❓</button>
-    </nav>
-    
-    <main>
-        <section class="pack-status">
-            <h2>デイリーパック: <span id="pack-count">10</span> / 10</h2>
-            <p class="status-text">パック満タン</p>
-            <p class="gold-pack-progress">ゴールドパックまであと <span id="pulls-left">10</span> 回</p>
-        </section>
 
-        <section class="gacha-area">
-            <div class="wiki-pack" id="open-pack-btn">
-                <div class="pack-title">Wiki Pack</div>
-                <div class="tap-text">▲ タップして開ける ▲</div>
+    <main class="container">
+        <section class="status-section">
+            <h1 class="title">Wikipedia Gacha</h1>
+            <div class="pack-status">
+                <h2>DAILY PACKS: <span id="pack-count">10</span> / 10</h2>
+                <p class="subtitle">Packs full</p>
+                <div class="progress-container">
+                    <p id="gold-pack-text"><span id="pulls-left">10</span> pulls until Gold Pack</p>
+                    <div class="progress-bar"><div class="progress-fill" id="gold-progress"></div></div>
+                </div>
             </div>
         </section>
 
-        <section class="missions">
-            <h3>デイリーミッション</h3>
+        <section class="gacha-section">
+            <div class="wiki-pack" id="open-pack-btn">
+                <div class="pack-visual">
+                    <div class="pack-logo">WIKI<br>PACK</div>
+                </div>
+                <p class="tap-text">▲ TAP TO OPEN ▲</p>
+            </div>
+        </section>
+
+        <section class="missions-section">
+            <h3>Daily Missions</h3>
             <ul class="mission-list">
-                <li><span>5パック開ける</span> <span class="progress">0/5</span></li>
-                <li><span>SR以上のカードを1枚引く</span> <span class="progress">0/1</span></li>
-                <li><span>Wikipediaを1回開く</span> <span class="progress">0/1</span></li>
-                <li><span>結果をシェアする</span> <span class="progress">0/1</span></li>
-                <li><span>広告を1回見る</span> <span class="progress">0/1</span></li>
+                <li><span class="m-text">Open 5 packs</span> <span class="m-progress" id="ms-open-packs">0/5</span></li>
+                <li><span class="m-text">Pull at least one SR+ card</span> <span class="m-progress" id="ms-sr">0/1</span></li>
+                <li><span class="m-text">Open Wikipedia once</span> <span class="m-progress" id="ms-wiki">0/1</span></li>
+                <li><span class="m-text">Share your result</span> <span class="m-progress">0/1</span></li>
+                <li><span class="m-text">Watch one ad</span> <span class="m-progress">0/1</span></li>
             </ul>
-            <p class="reward-text">報酬: ミッション達成ごとに +2 パック</p>
+            <p class="reward-text">Reward: +2 packs per completed mission</p>
         </section>
     </main>
 
-    <footer>
-        <a href="#">プライバシーポリシー</a> | 
-        <a href="#">利用規約</a> | 
-        <a href="#">お問い合わせ</a>
+    <footer class="footer">
+        <a href="#">Privacy Policy</a> | 
+        <a href="#">Terms of Service</a> | 
+        <a href="#">Contact</a>
     </footer>
 
     <div id="result-modal" class="modal hidden">
         <div class="modal-content">
-            <h2 id="card-rarity">SR</h2>
-            <h3 id="card-title">Wikipedia記事タイトル</h3>
-            <p id="card-desc">記事の概要がここに入ります...</p>
-            <button id="close-modal-btn">閉じる</button>
+            <div class="card" id="result-card">
+                <h2 id="card-rarity" class="rarity">UR</h2>
+                <h3 id="card-title" class="card-title">記事タイトル</h3>
+            </div>
+            <div class="modal-actions">
+                <a id="wiki-link" href="#" target="_blank" class="btn btn-wiki">Open Wikipedia</a>
+                <button id="close-btn" class="btn btn-close">Close</button>
+            </div>
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
